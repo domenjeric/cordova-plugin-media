@@ -265,11 +265,7 @@ BOOL keepAvAudioSessionAlwaysActive = NO;
             // Pass the AVPlayerItem to a new player
             avPlayer = [[AVPlayer alloc] initWithPlayerItem:playerItem];
 
-            // Avoid excessive buffering so streaming media can play instantly on iOS
-            // Removes preplay delay on ios 10+, makes consistent with ios9 behaviour
-            if ([NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){10,0,0}]) {
-                avPlayer.automaticallyWaitsToMinimizeStalling = NO;
-            }
+            //avPlayer = [[AVPlayer alloc] initWithURL:resourceUrl];
         }
 
         self.currMediaId = mediaId;
@@ -370,8 +366,8 @@ BOOL keepAvAudioSessionAlwaysActive = NO;
                     bPlayAudioWhenScreenIsLocked = [playAudioWhenScreenIsLocked boolValue];
                 }
 
-                NSString* sessionCategory = bPlayAudioWhenScreenIsLocked ? AVAudioSessionCategoryPlayback : AVAudioSessionCategorySoloAmbient;
-                [self.avSession setCategory:sessionCategory error:&err];
+                [self.avSession setCategory:AVAudioSessionCategoryPlayAndRecord error:&err];
+                [self.avSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
                 if (![self.avSession setActive:YES error:&err]) {
                     // other audio with higher priority that does not allow mixing could cause this to fail
                     NSLog(@"Unable to play audio: %@", [err localizedFailureReason]);
@@ -677,7 +673,8 @@ BOOL keepAvAudioSessionAlwaysActive = NO;
             // get the audioSession and set the category to allow recording when device is locked or ring/silent switch engaged
             if ([weakSelf hasAudioSession]) {
                 if (![weakSelf.avSession.category isEqualToString:AVAudioSessionCategoryPlayAndRecord]) {
-                    [weakSelf.avSession setCategory:AVAudioSessionCategoryRecord error:nil];
+                    [weakSelf.avSession setCategory:AVAudioSessionCategoryPlayAndRecord error:nil];
+                    [weakSelf.avSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
                 }
 
                 if (![weakSelf.avSession setActive:YES error:&error]) {
@@ -793,9 +790,6 @@ BOOL keepAvAudioSessionAlwaysActive = NO;
         [self onStatus:MEDIA_ERROR mediaId:mediaId param:
           [self createMediaErrorWithCode:MEDIA_ERR_DECODE message:nil]];
     }
-    if (! keepAvAudioSessionAlwaysActive && self.avSession && ! [self isPlayingOrRecording]) {
-        [self.avSession setActive:NO error:nil];
-    }
 }
 
 - (void)audioPlayerDidFinishPlaying:(AVAudioPlayer*)player successfully:(BOOL)flag
@@ -815,18 +809,11 @@ BOOL keepAvAudioSessionAlwaysActive = NO;
         [self onStatus:MEDIA_ERROR mediaId:mediaId param:
             [self createMediaErrorWithCode:MEDIA_ERR_DECODE message:nil]];
     }
-     if (! keepAvAudioSessionAlwaysActive && self.avSession && ! [self isPlayingOrRecording]) {
-         [self.avSession setActive:NO error:nil];
-     }
 }
 
 -(void)itemDidFinishPlaying:(NSNotification *) notification {
     // Will be called when AVPlayer finishes playing playerItem
     NSString* mediaId = self.currMediaId;
-
-     if (! keepAvAudioSessionAlwaysActive && self.avSession && ! [self isPlayingOrRecording]) {
-         [self.avSession setActive:NO error:nil];
-     }
     [self onStatus:MEDIA_STATE mediaId:mediaId param:@(MEDIA_STOPPED)];
 }
 
